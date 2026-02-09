@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ad Free Tic-Tac-Toe</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg: #050a18;
+            --glass: rgba(255, 255, 255, 0.08);
+            --cyan: #00f2ff;
+            --pink: #ff007b;
+            --gold: #ffcc00;
+        }
+
+        body {
+            background: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100dvh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* --- Full Screen Entry --- */
+        #entryScreen {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at center, #1a1a2e, #050a18);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            text-align: center;
+        }
+
+        .title-glow {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin-bottom: 40px;
+            background: linear-gradient(to bottom, var(--cyan), #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .start-btn {
+            padding: 18px 50px;
+            font-size: 1.2rem;
+            background: var(--cyan);
+            color: #000;
+            border: none;
+            border-radius: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px var(--cyan);
+            animation: pulseBtn 2s infinite;
+        }
+
+        @keyframes pulseBtn {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* --- Main Game App --- */
+        #gameApp {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 360px;
+        }
+
+        .scoreboard {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        select {
+            flex: 1;
+            background: #161b2c;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            outline: none;
+            appearance: none;
+        }
+
+        .status-bar {
+            font-size: 1.3rem;
+            color: var(--cyan);
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 12px;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+        }
+
+        .cell {
+            background: var(--glass);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            border: 1px solid rgba(255,255,255,0.1);
+            aspect-ratio: 1 / 1;
+        }
+
+        .cell.x { color: var(--cyan); text-shadow: 0 0 15px var(--cyan); }
+        .cell.o { color: var(--pink); text-shadow: 0 0 15px var(--pink); }
+
+        /* --- WIN ANIMATION --- */
+        .win-glow {
+            animation: winPulse 0.5s infinite alternate;
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--gold);
+        }
+
+        @keyframes winPulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.08); }
+        }
+
+        .history-container {
+            width: 100%;
+            margin-top: 25px;
+            text-align: center;
+        }
+
+        .history-btn {
+            background: transparent;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 10px 25px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #historyContent {
+            margin-top: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.9rem;
+        }
+
+        .waiting { pointer-events: none; }
+        .shake { animation: shake 0.4s; }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+    </style>
+</head>
+<body>
+
+    <div id="entryScreen">
+        <h1 class="title-glow">AD FREE<br>TIC-TAC-TOE</h1>
+        <button class="start-btn" onclick="initGame()">START GAME</button>
+    </div>
+
+    <div id="gameApp">
+        <div class="scoreboard">
+            <span style="color:var(--cyan)">P1: <span id="sX">0</span></span>
+            <span id="p2Label" style="color:var(--pink)">CPU: <span id="sO">0</span></span>
+        </div>
+
+        <div class="controls-row">
+            <select id="mode" onchange="resetGame(); updateUI();">
+                <option value="pvc">VS Computer</option>
+                <option value="pvp">1v1 Local</option>
+            </select>
+            <select id="diff">
+                <option value="beginner">Beginner</option>
+                <option value="pro">Pro</option>
+                <option value="experienced">Experienced</option>
+            </select>
+        </div>
+
+        <div class="status-bar" id="status">Turn: X</div>
+
+        <div class="board" id="board">
+            <div class="cell" data-i="0"></div>
+            <div class="cell" data-i="1"></div>
+            <div class="cell" data-i="2"></div>
+            <div class="cell" data-i="3"></div>
+            <div class="cell" data-i="4"></div>
+            <div class="cell" data-i="5"></div>
+            <div class="cell" data-i="6"></div>
+            <div class="cell" data-i="7"></div>
+            <div class="cell" data-i="8"></div>
+        </div>
+
+        <div class="history-container">
+            <button class="history-btn" onclick="toggleHistory()">VIEW HISTORY</button>
+            <div id="historyContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let grid = ["", "", "", "", "", "", "", "", ""];
+        let turn = "X";
+        let playing = true;
+        let isThinking = false;
+        let scoreX = 0, scoreO = 0;
+        let matches = [];
+
+        const audio = new (window.AudioContext || window.webkitAudioContext)();
+        function beep(f) {
+            const o = audio.createOscillator();
+            const g = audio.createGain();
+            o.connect(g); g.connect(audio.destination);
+            o.frequency.value = f;
+            g.gain.setValueAtTime(0.05, audio.currentTime);
+            o.start(); o.stop(audio.currentTime + 0.1);
+        }
+
+        function initGame() {
+            document.getElementById('entryScreen').style.display = 'none';
+            document.getElementById('gameApp').style.display = 'flex';
+        }
+
+        function updateUI() {
+            const isPvp = document.getElementById('mode').value === 'pvp';
+            document.getElementById('p2Label').innerHTML = isPvp ? `P2: <span id="sO">${scoreO}</span>` : `CPU: <span id="sO">${scoreO}</span>`;
+            document.getElementById('diff').style.display = isPvp ? 'none' : 'block';
+        }
+
+        function clickCell(e) {
+            const i = e.target.dataset.i;
+            if (!playing || isThinking || grid[i] !== "") return;
+
+            makeMove(i, turn);
+
+            if (playing && document.getElementById('mode').value === 'pvc' && turn === "O") {
+                isThinking = true;
+                document.getElementById('board').classList.add('waiting');
+                setTimeout(cpuPlay, 600);
+            }
+        }
+
+        function makeMove(i, symbol) {
+            grid[i] = symbol;
+            const c = document.querySelector(`[data-i="${i}"]`);
+            c.innerText = symbol;
+            c.classList.add(symbol.toLowerCase());
+            beep(symbol === 'X' ? 440 : 330);
+
+            if (checkEnd()) return;
+
+            turn = (turn === "X") ? "O" : "X";
+            document.getElementById('status').innerText = `Turn: ${turn}`;
+        }
+
+        function checkEnd() {
+            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            let winner = null;
+            let winningLine = null;
+
+            for (let w of wins) {
+                if (grid[w[0]] && grid[w[0]] === grid[w[1]] && grid[w[0]] === grid[w[2]]) {
+                    winner = grid[w[0]];
+                    winningLine = w;
+                }
+            }
+
+            if (winner || !grid.includes("")) {
+                playing = false;
+                if (winner) {
+                    document.getElementById('status').innerText = winner + " WINS!";
+                    
+                    // Highlight the winning cells
+                    winningLine.forEach(idx => {
+                        document.querySelector(`[data-i="${idx}"]`).classList.add('win-glow');
+                    });
+
+                    if (winner === "X") {
+                        scoreX++; document.getElementById('sX').innerText = scoreX;
+                        confetti({ particleCount: 100, spread: 50, origin: { y: 0.8 } });
+                    } else {
+                        scoreO++; document.getElementById('sO').innerText = scoreO;
+                        document.getElementById('gameApp').classList.add('shake');
+                    }
+                    saveHistory(winner + " WON");
+                } else {
+                    document.getElementById('status').innerText = "DRAW!";
+                    saveHistory("DRAW");
+                }
+                setTimeout(resetGame, 2000);
+                return true;
+            }
+            return false;
+        }
+
+        function saveHistory(res) {
+            matches.unshift(res);
+            if (matches.length > 5) matches.pop();
+            document.getElementById('historyContent').innerHTML = matches.map(m => `<div class="history-item">${m}</div>`).join('');
+        }
+
+        function toggleHistory() {
+            const content = document.getElementById('historyContent');
+            content.style.maxHeight = content.style.maxHeight === '200px' ? '0' : '200px';
+        }
+
+        function resetGame() {
+            grid = ["", "", "", "", "", "", "", "", ""];
+            turn = "X";
+            playing = true;
+            isThinking = false;
+            document.getElementById('status').innerText = "Turn: X";
+            document.getElementById('gameApp').classList.remove('shake');
+            document.getElementById('board').classList.remove('waiting');
+            document.querySelectorAll('.cell').forEach(c => { 
+                c.innerText = ""; 
+                c.className = "cell"; 
+            });
+        }
+
+        function cpuPlay() {
+            const d = document.getElementById('diff').value;
+            let move;
+            if (d === 'beginner') move = rndMove();
+            else move = bestMove();
+            makeMove(move, "O");
+            isThinking = false;
+            document.getElementById('board').classList.remove('waiting');
+        }
+
+        function rndMove() {
+            const avail = grid.map((v, i) => v === "" ? i : null).filter(v => v !== null);
+            return avail[Math.floor(Math.random() * avail.length)];
+        }
+
+        function bestMove() {
+            let bS = -Infinity, move;
+            for(let i=0; i<9; i++){
+                if(grid[i]===""){
+                    grid[i]="O"; let s = minimax(grid, 0, false); grid[i]="";
+                    if(s > bS){ bS = s; move = i; }
+                }
+            }
+            return move;
+        }
+
+        function minimax(g, d, isM) {
+            const winner = getW(g);
+            if(winner === "O") return 10;
+            if(winner === "X") return -10;
+            if(!g.includes("")) return 0;
+            if(isM){
+                let b = -Infinity;
+                for(let i=0; i<9; i++) if(g[i]===""){ g[i]="O"; b=Math.max(b, minimax(g,d+1,false)); g[i]=""; }
+                return b;
+            } else {
+                let b = Infinity;
+                for(let i=0; i<9; i++) if(g[i]===""){ g[i]="X"; b=Math.min(b, minimax(g,d+1,true)); g[i]=""; }
+                return b;
+            }
+        }
+
+        function getW(g) {
+            const w = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for(let c of w) if(g[c[0]] && g[c[0]]===g[c[1]] && g[c[0]]===g[c[2]]) return g[c[0]];
+            return null;
+        }
+
+        document.querySelectorAll('.cell').forEach(c => c.addEventListener('click', clickCell));
+    </script>
+</body>
+</html>
